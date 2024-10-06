@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "src"
+version = "0.1.0"
+description = ""
+authors = ["Kazuya Izumi <shikibu9419@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+tobii-research = "^1.11.0"
+fastapi = "^0.104.1"
+pydantic = "^2.4.2"
+uvicorn = {extras = ["standard"], version = "^0.31.0"}
+numpy = "^1.26.2"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+dev = "src.app:start"
