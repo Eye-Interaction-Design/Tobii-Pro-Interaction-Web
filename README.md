@@ -11,8 +11,8 @@ First, follow the steps below to install the Intel (Rosetta 2) version of Python
 
 ```shell
 # after installing drivers for Intel macOS
-> poetry env <path to the installed Python>
-> poetry install
+> export UV_PYTHON=<path to the installed Python>
+> uv sync
 ```
 
 ### Setup
@@ -22,6 +22,5 @@ First, follow the steps below to install the Intel (Rosetta 2) version of Python
 3. Run the following:
 
 ```shell
-> poetry install
-> poetry run dev
+> uv run uvicorn src.app:app --reload
 ```

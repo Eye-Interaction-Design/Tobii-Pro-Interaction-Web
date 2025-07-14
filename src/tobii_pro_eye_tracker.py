@@ -1,3 +1,4 @@
+from typing import Callable, Optional
 import tobii_research as tr
 from math import isnan, nan
 from time import time
@@ -12,9 +13,15 @@ oe_filter_x = OneEuroFilter()
 oe_filter_y = OneEuroFilter()
 ivt_filter = IvtFilter(v_threshold=2)
 
+GazeCallback = Optional[Callable[[GazePoint], None]]
 
-class EyeTracker:
-    def __init__(self) -> None:
+class TobiiProEyeTracker:
+    device: tr.EyeTracker
+    calibration: tr.ScreenBasedCalibration
+    serial_number: str
+    on_gaze_data: GazeCallback = None
+
+    def __init__(self, device: tr.EyeTracker) -> None:
         self.output_file = ""
         self.current_timestamp = None
         self.user_exists = False
@@ -23,15 +30,8 @@ class EyeTracker:
         self.left_eye_position = EyePosition(x=nan, y=nan, z=nan)
         self.right_eye_position = EyePosition(x=nan, y=nan, z=nan)
 
-        devices = tr.find_all_eyetrackers()
-        if devices:
-            self.device = devices[0]
-            self.calibration = tr.ScreenBasedCalibration(self.device)
-        else:
-            self.device = None
-            self.calibration = None
-            print("No eyetrackers found")
-            return
+        self.device = device
+        self.calibration = tr.ScreenBasedCalibration(device)
 
 
     def gaze_data_callback(self, gaze_point):
@@ -56,6 +56,9 @@ class EyeTracker:
         # Fixation filter
         fp = ivt_filter(self.current_timestamp / 1000000, x, y)
         self.fixation_point = GazePoint(x=fp[0], y=fp[1])
+
+        if self.on_gaze_data:
+            self.on_gaze_data(self.gaze_point)
 
 
     def user_position_guide_callback(self, user_position_guide):

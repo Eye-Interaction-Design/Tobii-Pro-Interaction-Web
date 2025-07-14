@@ -1,13 +1,13 @@
+from typing import Optional, List
 import uvicorn
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, WebSocket, HTTPException
 from starlette.middleware.cors import CORSMiddleware
 
 import json
 import asyncio
+from time import sleep
 
-from .eye_tracker import EyeTracker, GazePoint, tr
-
-eyetracker = EyeTracker()
+from .tobii_pro_eye_tracker import TobiiProEyeTracker, GazePoint, tr
 
 app = FastAPI()
 app.add_middleware(
@@ -19,17 +19,53 @@ app.add_middleware(
 )
 
 
-async def send_gaze_point(websocket: WebSocket):
+eyetracker: Optional[TobiiProEyeTracker] = None
+connected_clients: List[WebSocket] = []
+
+
+def handle_gaze_data(gaze_point: GazePoint):
+    asyncio.create_task(broadcast_gaze_data(gaze_point))
+
+
+def wait_for_device():
+    global eyetracker
+
     while True:
-        await asyncio.sleep(1 / 60)
-        await websocket.send_text(json.dumps({ "x": eyetracker.gaze_point.x, "y": eyetracker.gaze_point.y }))
+        if eyetracker:
+            break
+
+        devices = tr.find_all_eyetrackers()
+        if devices:
+            eyetracker = TobiiProEyeTracker(devices[0])
+            eyetracker.on_gaze_data = handle_gaze_data
+            eyetracker.subscribe()
+
+        sleep(1)
 
 
-@app.websocket("/ws")
+async def broadcast_gaze_data(gaze_point: GazePoint):
+    if not connected_clients:
+        return
+
+    message = json.dumps({"x": gaze_point.x, "y": gaze_point.y})
+    disconnected_clients = []
+
+    for client in connected_clients:
+        try:
+            await client.send_text(message)
+        except Exception as e:
+            print(f"Error sending to client: {e}")
+            disconnected_clients.append(client)
+
+    # Remove disconnected clients
+    for client in disconnected_clients:
+        connected_clients.remove(client)
+
+
+@app.websocket("/eye_tracking")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-
-    asyncio.create_task(send_gaze_point(websocket))
+    connected_clients.append(websocket)
 
     try:
         while True:
@@ -39,13 +75,15 @@ async def websocket_endpoint(websocket: WebSocket):
     except Exception as e:
         print(f"Error: {e}")
     finally:
+        if websocket in connected_clients:
+            connected_clients.remove(websocket)
         await websocket.close()
 
 
 @app.post("/calibration:start")
 async def calibration_start():
-    if not eyetracker.calibration:
-        return { "message": "eyetracker not found" }
+    if not eyetracker:
+        raise HTTPException(status_code=400, detail="CONNECT EYETRACKER FIRST")
 
     try:
         eyetracker.calibration.enter_calibration_mode()
@@ -61,8 +99,8 @@ async def calibration_start():
 
 @app.post("/calibration:collect")
 async def calibration_collect(point: GazePoint):
-    if not eyetracker.calibration:
-        return { "message": "eyetracker not found" }
+    if not eyetracker:
+        raise HTTPException(status_code=400, detail="CONNECT EYETRACKER FIRST")
 
     print("Collect:", point.x, point.y)
 
@@ -74,8 +112,8 @@ async def calibration_collect(point: GazePoint):
 
 @app.post("/calibration:result")
 async def calibration_result(force: bool = False):
-    if not eyetracker.calibration:
-        return { "message": "eyetracker not found" }
+    if not eyetracker:
+        raise HTTPException(status_code=400, detail="CONNECT EYETRACKER FIRST")
 
     calibration_result = eyetracker.calibration.compute_and_apply()
 
@@ -100,12 +138,13 @@ async def calibration_result(force: bool = False):
 
 @app.on_event("startup")
 async def startup():
-    eyetracker.subscribe()
+    wait_for_device()
 
 
 @app.on_event("shutdown")
 async def shutdown():
-    eyetracker.unsubscribe()
+    if eyetracker:
+        eyetracker.unsubscribe()
 
 
 def start():

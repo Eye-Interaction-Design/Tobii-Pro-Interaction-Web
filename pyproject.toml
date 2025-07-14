@@ -1,22 +1,16 @@
-[tool.poetry]
-name = "src"
+[project]
+name = "tobii-pro-interaction"
 version = "0.1.0"
-description = ""
-authors = ["Kazuya Izumi <shikibu9419@gmail.com>"]
+description = "Add your description here"
 readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.116.1",
+    "numpy>=2.2.6",
+    "pydantic>=2.11.7",
+    "tobii-research>=2.1.0",
+    "uvicorn>=0.35.0",
+]
 
-[tool.poetry.dependencies]
-python = "^3.10"
-tobii-research = "^1.11.0"
-fastapi = "^0.104.1"
-pydantic = "^2.4.2"
-uvicorn = {extras = ["standard"], version = "^0.31.0"}
-numpy = "^1.26.2"
-
-
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
-
-[tool.poetry.scripts]
-dev = "src.app:start"
+[project.scripts]
+dev = "uvicorn src.app:app --reload"
