@@ -9,7 +9,7 @@ dependencies = [
     "numpy>=2.2.6",
     "pydantic>=2.11.7",
     "tobii-research>=2.1.0",
-    "uvicorn>=0.35.0",
+    "uvicorn[standard]>=0.35.0",
 ]
 
 [project.scripts]

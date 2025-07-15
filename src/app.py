@@ -21,10 +21,11 @@ app.add_middleware(
 
 eyetracker: Optional[TobiiProEyeTracker] = None
 connected_clients: List[WebSocket] = []
+main_loop = None
 
 
 def handle_gaze_data(gaze_point: GazePoint):
-    asyncio.create_task(broadcast_gaze_data(gaze_point))
+    broadcast_gaze_data(gaze_point)
 
 
 def wait_for_device():
@@ -43,8 +44,8 @@ def wait_for_device():
         sleep(1)
 
 
-async def broadcast_gaze_data(gaze_point: GazePoint):
-    if not connected_clients:
+def broadcast_gaze_data(gaze_point: GazePoint):
+    if not connected_clients or not main_loop:
         return
 
     message = json.dumps({"x": gaze_point.x, "y": gaze_point.y})
@@ -52,7 +53,8 @@ async def broadcast_gaze_data(gaze_point: GazePoint):
 
     for client in connected_clients:
         try:
-            await client.send_text(message)
+            print("Sending message to client:", message)
+            asyncio.run_coroutine_threadsafe(client.send_text(message), main_loop)
         except Exception as e:
             print(f"Error sending to client: {e}")
             disconnected_clients.append(client)
@@ -138,7 +140,9 @@ async def calibration_result(force: bool = False):
 
 @app.on_event("startup")
 async def startup():
-    wait_for_device()
+    global main_loop
+    main_loop = asyncio.get_event_loop()
+    asyncio.create_task(asyncio.to_thread(wait_for_device))
 
 
 @app.on_event("shutdown")
